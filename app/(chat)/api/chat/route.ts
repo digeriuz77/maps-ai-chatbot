@@ -1,4 +1,5 @@
 import { convertToCoreMessages, Message, streamText } from "ai";
+
 import { geminiProModel } from "@/ai";
 import { auth } from "@/app/(auth)/auth";
 import {
@@ -7,14 +8,12 @@ import {
   saveChat,
 } from "@/db/queries";
 import { MIChatbot, createMIChatbot } from "@/lib/mi-chatbot";
-import { Character, updateCharacterState, getInitialCharacter } from "@/lib/character";
 
 // Use a Map to store MIChatbot instances for each user
 const userChatbots = new Map<string, MIChatbot>();
 
 export async function POST(request: Request) {
-  const { id, messages }: { id: string; messages: Array<Message> } =
-    await request.json();
+  const { id, messages }: { id: string; messages: Array<Message> } = await request.json();
 
   const session = await auth();
 
@@ -69,7 +68,33 @@ export async function POST(request: Request) {
   return result.toDataStreamResponse({});
 }
 
-// The DELETE function remains unchanged
 export async function DELETE(request: Request) {
-  // ... (keep existing implementation)
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return new Response("Not Found", { status: 404 });
+  }
+
+  const session = await auth();
+
+  if (!session || !session.user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const chat = await getChatById({ id });
+
+    if (chat.userId !== session.user.id) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    await deleteChatById({ id });
+
+    return new Response("Chat deleted", { status: 200 });
+  } catch (error) {
+    return new Response("An error occurred while processing your request", {
+      status: 500,
+    });
+  }
 }
