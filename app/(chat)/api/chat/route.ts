@@ -7,6 +7,7 @@ import {
   saveChat,
 } from "@/db/queries";
 import { MIChatbot, createMIChatbot } from "@/lib/mi-chatbot";
+import { Character, updateCharacterState, getInitialCharacter } from "@/lib/character";
 
 // Use a Map to store MIChatbot instances for each user
 const userChatbots = new Map<string, MIChatbot>();
