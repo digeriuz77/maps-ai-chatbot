@@ -9,15 +9,13 @@ export interface Character {
 }
 
 export function updateCharacterState(character: Character, userMessage: string): Character {
-  // Implement state transition logic here
-  // This is a simplified example
-  if (userMessage.toLowerCase().includes('understand') || userMessage.toLowerCase().includes('appreciate')) {
+  if (detectsEmpathy(userMessage)) {
     return {
       ...character,
       readinessToChange: 'contemplation',
       hiddenBackstory: { ...character.hiddenBackstory, revealed: true }
     };
-  } else if (userMessage.toLowerCase().includes('must') || userMessage.toLowerCase().includes('need to')) {
+  } else if (detectsConfrontation(userMessage)) {
     return {
       ...character,
       readinessToChange: 'pre-contemplation',
@@ -25,4 +23,26 @@ export function updateCharacterState(character: Character, userMessage: string):
     };
   }
   return character;
+}
+
+export function getInitialCharacter(): Character {
+  return {
+    name: "Disaffected Employee",
+    emotionalState: 'neutral',
+    readinessToChange: 'pre-contemplation',
+    hiddenBackstory: {
+      details: 'You have been diagnosed with anxiety recently.',
+      revealed: false
+    }
+  };
+}
+
+function detectsEmpathy(message: string): boolean {
+  const empathyPhrases = ['understand', 'appreciate', 'it sounds like', 'that must be difficult'];
+  return empathyPhrases.some(phrase => message.toLowerCase().includes(phrase));
+}
+
+function detectsConfrontation(message: string): boolean {
+  const confrontationalPhrases = ['you must', 'why can\'t you', 'you need to', 'this is unacceptable'];
+  return confrontationalPhrases.some(phrase => message.toLowerCase().includes(phrase));
 }
