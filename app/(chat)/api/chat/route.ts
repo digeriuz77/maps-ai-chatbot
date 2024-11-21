@@ -1,33 +1,46 @@
 import { convertToCoreMessages, Message, streamText } from "ai";
 import { geminiProModel } from "@/ai";
 import { auth } from "@/app/(auth)/auth";
-import { deleteChatById, getChatById, saveChat } from "@/db/queries";
-import { Character, updateCharacterState, getInitialCharacter } from "@/lib/character";
+import {
+  deleteChatById,
+  getChatById,
+  saveChat,
+} from "@/db/queries";
+import { MIChatbot, createMIChatbot } from "@/lib/mi-chatbot";
+
+// Use a Map to store MIChatbot instances for each user
+const userChatbots = new Map<string, MIChatbot>();
 
 export async function POST(request: Request) {
-  const { id, messages }: { id: string; messages: Array<Message> } = await request.json();
+  const { id, messages }: { id: string; messages: Array<Message> } =
+    await request.json();
 
   const session = await auth();
+
   if (!session) {
     return new Response("Unauthorized", { status: 401 });
   }
 
   const coreMessages = convertToCoreMessages(messages).filter(
-    (message) => message.content.length > 0
+    (message) => message.content.length > 0,
   );
 
-  // Retrieve or initialize character state
-  let character: Character = await getCharacterState(session.user.id);
+  // Get or create MIChatbot instance for the user
+  let chatbot = userChatbots.get(session.user.id);
+  if (!chatbot) {
+    chatbot = createMIChatbot();
+    userChatbots.set(session.user.id, chatbot);
+  }
 
-  // Update character state based on the last user message
+  // Update chatbot state based on the last user message
   if (coreMessages.length > 0) {
     const lastUserMessage = coreMessages[coreMessages.length - 1].content;
-    character = updateCharacterState(character, lastUserMessage);
+    chatbot.updateState(lastUserMessage);
   }
 
   const result = await streamText({
     model: geminiProModel,
-    system: generateSystemPrompt(character),
+    system: chatbot.getSystemPrompt(),
     messages: coreMessages,
     tools: {
       // If there are any existing tools that need to be kept, they should be included here
@@ -40,9 +53,9 @@ export async function POST(request: Request) {
             messages: [...coreMessages, ...responseMessages],
             userId: session.user.id,
           });
-          await saveCharacterState(session.user.id, character);
+          // Note: Character state is automatically saved in the MIChatbot instance
         } catch (error) {
-          console.error("Failed to save chat or character state");
+          console.error("Failed to save chat");
         }
       }
     },
@@ -58,26 +71,4 @@ export async function POST(request: Request) {
 // The DELETE function remains unchanged
 export async function DELETE(request: Request) {
   // ... (keep existing implementation)
-}
-
-// Helper functions
-async function getCharacterState(userId: string): Promise<Character> {
-  // TODO: Implement retrieval from database
-  return getInitialCharacter();
-}
-
-async function saveCharacterState(userId: string, character: Character): Promise<void> {
-  // TODO: Implement saving to database
-  console.log("Saving character state:", character);
-}
-
-function generateSystemPrompt(character: Character): string {
-  return `
-    You are role-playing as ${character.name}, an employee who is ${character.emotionalState}.
-    Your current readiness to change is: ${character.readinessToChange}.
-    ${character.hiddenBackstory.revealed ? `You have recently experienced: ${character.hiddenBackstory.details}` : ''}
-    Respond in a way that reflects your current emotional state and readiness to change.
-    Keep your responses concise and limited to a few sentences.
-    Engage in a manner consistent with Motivational Interviewing techniques.
-  `;
 }
